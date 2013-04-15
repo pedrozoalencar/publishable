@@ -12,7 +12,7 @@ describe Publishable do
         attr_accessible :title, :body, :published
         validates :body, :title, :presence => true
         extend Publishable
-        publishable
+        publishable :type => :boolean
       end
     end
 
@@ -36,17 +36,18 @@ describe Publishable do
 
   end
 
-  context 'with a Date publish attribute' do
+  context 'with a Date publish start and publish end attributes' do
 
     before :all do
       build_model :post do
         string :title
         text :body
-        date :published
-        attr_accessible :title, :body, :published
+        date :publish_start
+        date :publish_end
+        attr_accessible :title, :body, :publish_start, :publish_end
         validates :body, :title, :presence => true
         extend Publishable
-        publishable
+        publishable :type => :date
       end
     end
 
@@ -57,27 +58,35 @@ describe Publishable do
       @post.should_not be_published
     end
 
-    it 'should be published if today is after the publish date' do
-      @post.published = Date.current - 1.days
+    it 'should be published if today is after the publish start date and before the publish end date' do
+      @post.publish_start = Date.current - 1.days
+      @post.publish_end = Date.current + 2.days
       @post.should be_published
     end
 
-    it 'should be published if today is the publish date' do
-      @post.published = Date.current
+    it 'should be published if today is the publish start date' do
+      @post.publish_start = Date.current
+      @post.publish_end = Date.current
       @post.should be_published
     end
 
-    it 'should not be published if today is before the publish date' do
-      @post.published = Date.current + 1.days
+    it 'should not be published if today is before the publish start date' do
+      @post.publish_start = Date.current + 1.days
+      @post.publish_end = Date.current + 2.days
+      @post.should_not be_published
+    end
+
+    it 'should not be published if today is after the publish end date' do
+      @post.publish_start = Date.current - 2.days
+      @post.publish_end = Date.current - 1.days
       @post.should_not be_published
     end
 
     it 'should have a publish date of today or earlier after publish is directly called' do
       @post.publish
       @post.should be_published
-      @post.published.should <= Date.current
+      @post.publish_start.should <= Date.current
     end
-
   end
 
   context 'with a DateTime publish attribute' do
@@ -86,8 +95,8 @@ describe Publishable do
       build_model :post do
         string :title
         text :body
-        datetime :published
-        attr_accessible :title, :body, :published
+        datetime :publish_start, :publish_end
+        attr_accessible :title, :body, :publish_start, :publish_end
         validates :body, :title, :presence => true
         extend Publishable
         publishable
@@ -104,19 +113,19 @@ describe Publishable do
       end
 
       it 'should be published if now is after the publish time' do
-        @post.published = DateTime.now - 1.minute
+        @post.publish_start = DateTime.now - 1.minute
         @post.should be_published
       end
 
       it 'should not be published if now is before the publish time' do
-        @post.published = DateTime.now + 1.minute
+        @post.publish_start = DateTime.now + 1.minute
         @post.should_not be_published
       end
 
       it 'should have a publish time of now or earlier after publish is directly called' do
         @post.publish
         @post.should be_published
-        @post.published.should <= DateTime.now
+        @post.publish_start.should <= DateTime.now
       end
 
     end
@@ -127,7 +136,7 @@ describe Publishable do
         # create a bunch of published Posts
         (rand(9) + 1).times do
           days_ago = (rand(100) + 1).days
-          Post.create :published => Date.current - days_ago,
+          Post.create :publish_start => Date.current - days_ago,
                       :title => Faker::Lorem.sentence(4), 
                       :body => Faker::Lorem.paragraphs(3).join("\n")
         end
@@ -147,7 +156,7 @@ describe Publishable do
           # create a known number of unpublished Posts
           how_many.times do
             days_from_now = (rand(100) + 1).days
-            Post.create :published => Date.current + days_from_now,
+            Post.create :publish_start => Date.current + days_from_now,
                         :title => Faker::Lorem.sentence(4), 
                         :body => Faker::Lorem.paragraphs(3).join("\n")
           end
@@ -182,7 +191,7 @@ describe Publishable do
         it "should return all #{how_many} recent queries if no limit is specified" do
           # create a known number of published posts
           how_many.times do
-            Post.create :published => Date.current - rand(100).days, 
+            Post.create :publish_start => Date.current - rand(100).days, 
                         :title => Faker::Lorem.sentence(4), 
                         :body => Faker::Lorem.paragraphs(3).join("\n")
           end
@@ -201,7 +210,7 @@ describe Publishable do
         Timecop.travel(new_time)
 
         (-5..5).each do |n|
-          Post.create :published =>  Date.current + n.days, 
+          Post.create :publish_start =>  Date.current + n.days, 
                       :title =>  Faker::Lorem.sentence(4), 
                       :body =>  Faker::Lorem.paragraphs(3).join("\n")
         end
@@ -250,19 +259,6 @@ describe Publishable do
   end
 
   describe 'with an invalid configuration' do
-
-    it 'should raise a configuration error when defined on an invalid column type' do
-      expect {
-        build_model :post do
-          string :title
-          text :body
-          attr_accessible :title, :body
-          validates :body, :title, :presence => true
-          extend Publishable
-          publishable :on => :title
-        end
-      }.to raise_error ActiveRecord::ConfigurationError
-    end
 
     it 'should raise a configuration error when the publish column not defined' do
       expect {

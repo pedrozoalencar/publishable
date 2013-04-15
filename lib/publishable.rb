@@ -37,36 +37,65 @@ module Publishable
     # @option options [String, Symbol] :on (:publishable) The name of the publishable column on the model.
     def publishable(options = {})
       return unless table_exists?
-      column_name = (options[:on] || :published).to_sym
-      unless self.columns_hash[column_name.to_s].present?
-        raise ActiveRecord::ConfigurationError, "No '#{column_name}'column available for Publishable column on model #{self.name}"
+      publish_type = (options[:type] || :datetime)
+      column_name = nil;
+      column_start_name = nil;
+      column_end_name = nil;
+
+      #Obtain columns name and check consistency between publish type and column type
+      case publish_type
+        when :date, :datetime
+          column_start_name = (options[:start] || :publish_start).to_sym
+          column_end_name = (options[:end] || :publish_end).to_sym
+
+          unless self.columns_hash[column_start_name.to_s].present? and self.columns_hash[column_end_name.to_s].present?
+            raise ActiveRecord::ConfigurationError, "No '#{column_start_name}'column available for Publishable column on model #{self.name}"
+          end
+
+          column_start_type = self.columns_hash[column_start_name.to_s].type
+          column_end_type = self.columns_hash[column_end_name.to_s].type
+
+          #Raise a error case publish type and column_type not equals
+          unless column_start_type == publish_type 
+            raise ActiveRecord::ConfigurationError, "The '#{column_start_name}'column not equals declared type publish on model #{self.name}"
+          end
+          unless column_end_type == publish_type 
+            raise ActiveRecord::ConfigurationError, "The '#{column_end_name}'column not equals declared type publish on model #{self.name}"
+          end
+        when :boolean
+          column_name = (options[:on] || :published).to_sym
+          column_type = self.columns_hash[column_name.to_s].type
+
+          #Raise a error case publish type and column_type not equals
+          unless column_type == publish_type 
+            raise ActiveRecord::ConfigurationError, "The '#{column_name}'column not equals declared type publish on model #{self.name}"
+          end
+          unless self.columns_hash[column_name.to_s].present? and self.columns_hash[column_name.to_s].present?
+            raise ActiveRecord::ConfigurationError, "No '#{column_name}'column available for Publishable column on model #{self.name}"
+          end
+        else
+          raise ActiveRecord::ConfigurationError, "Invalid publish_type #{publish_type} for Publishable column on model #{self.name}"
       end
-      column_type = self.columns_hash[column_name.to_s].type
+
+      
 
       if respond_to?(:scope)
 
         # define published/unpublished scope
-        case column_type
-          when :date
+        case publish_type
+          when :date,:datetime
             scope :published, lambda { |*args|
-              on_date = args[0] || Date.current
-              where(arel_table[column_name].not_eq(nil)).where(arel_table[column_name].lteq(on_date))
+              start_date = args[0] || Date.current
+              end_date = args[1]
+
+              where(arel_table[column_start_name].not_eq(nil)).where(arel_table[column_start_name].lteq(start_date))
+                .where(arel_table[column_end_name].eq(nil).or(arel_table[column_end_name].gteq(end_date)))
             }
 
             scope :unpublished, lambda { |*args|
-              on_date = args[0] || Date.current
-              where(arel_table[column_name].not_eq(nil)).where(arel_table[column_name].gt(on_date))
-            }
-
-          when :datetime
-            scope :published, lambda { |*args|
-              at_time = args[0] || Time.now
-              where(arel_table[column_name].not_eq(nil)).where(arel_table[column_name].lteq(at_time.utc))
-            }
-
-            scope :unpublished, lambda { |*args|
-              at_time = args[0] || Time.now
-              where(arel_table[column_name].not_eq(nil)).where(arel_table[column_name].gt(at_time.utc))
+              start_date = args[0] || Date.current
+              end_date = args[1]
+              where(arel_table[column_start_name].gt(start_date).or(arel_table[column_end_name].lt(end_date)))
             }
 
           when :boolean
@@ -79,80 +108,67 @@ module Publishable
             }
 
           else
-            raise ActiveRecord::ConfigurationError, "Invalid column_type #{column_type} for Publishable column on model #{self.name}"
+            raise ActiveRecord::ConfigurationError, "Invalid column_type #{publish_type} for Publishable column on model #{self.name}"
         end
 
         # define recent/upcoming scopes
-        if [:date, :datetime].include? column_type
+        if [:date, :datetime].include? publish_type
           scope :recent, lambda { |*args|
             how_many = args[0] || nil
-            col_name = arel_table[column_name].name
+            col_name = arel_table[column_start_name].name
             published.limit(how_many).order("#{col_name} DESC")
           }
           scope :upcoming, lambda { |*args|
             how_many = args[0] || nil
-            col_name = arel_table[column_name].name
+            col_name = arel_table[column_start_name].name
             unpublished.limit(how_many).order("#{col_name} ASC")
           }
         end
 
       end
 
-      case column_type
-        when :datetime
+      case publish_type
+        when :date, :datetime
           class_eval <<-EVIL, __FILE__, __LINE__ + 1
-            def published?(_when = Time.now)
-              #{column_name} ? #{column_name} <= _when : false
+            def published?(_when = DateTime.now)
+              if('#{publish_type}'.to_sym == :date) 
+                _when = _when.to_date
+              end
+              #{column_start_name} ? #{column_start_name} <= _when && 
+                ( #{column_end_name} ? #{column_end_name} >= _when : true) : false
             end
 
-            def unpublished?(_when = Time.now)
+            def unpublished?(_when = DateTime.now)
               !published?(_when)
             end
 
-            def publish(_when = Time.now)
-              self.#{column_name} = _when unless published?(_when)
+            def publish(_when_start = DateTime.now, _when_end = nil)
+              if('#{publish_type}'.to_sym == :date) 
+                _when_start = _when_start.to_date
+              end
+
+              unless published?(_when_start)
+                self.#{column_start_name} = _when_start
+                self.#{column_end_name} = _when_end
+
+                puts self.#{column_start_name}
+              end
             end
 
-            def publish!(_when = Time.now)
-              publish(_when) && (!respond_to?(:save) || save)
+            def publish!(_when_start = DateTime.now, _when_end = nil)
+              publish(_when_start, _when_end) && (!respond_to?(:save) || save)
             end
 
             def unpublish()
-              self.#{column_name} = null
+              self.#{column_start_name} = null
+              self.#{column_end_name} = null
             end
 
             def unpublish!()
               unpublish() && (!respond_to?(:save) || save)
             end
           EVIL
-
-        when :date
-          class_eval <<-EVIL, __FILE__, __LINE__ + 1
-            def published?(_when = Date.current)
-              #{column_name} ? #{column_name} <= _when : false
-            end
-
-            def unpublished?(_when = Date.current)
-              !published?(_when)
-            end
-
-            def publish(_when = Date.current)
-              self.#{column_name} = _when unless published?(_when)
-            end
-
-            def publish!(_when = Date.current)
-              publish(_when) && (!respond_to?(:save) || save)
-            end
-
-            def unpublish()
-              self.#{column_name} = null
-            end
-
-            def unpublish!()
-              unpublish() && (!respond_to?(:save) || save)
-            end
-          EVIL
-
+        
         when :boolean
           class_eval <<-EVIL, __FILE__, __LINE__ + 1
             def published?()
@@ -183,7 +199,7 @@ module Publishable
           EVIL
 
         else
-          raise ActiveRecord::ConfigurationError, "Invalid column_type #{column_type} for Publishable column on model #{self.name}"
+          raise ActiveRecord::ConfigurationError, "Invalid column_type #{publish_type} for Publishable column on model #{self.name}"
       end
 
     end
