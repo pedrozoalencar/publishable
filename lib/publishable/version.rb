@@ -24,7 +24,7 @@ module Publishable
     PRERELEASE = nil
 
     # The build number; can be used for e.g. git version of current build, etc.
-    BUILD = nil
+    BUILD = Time.now.to_s
 
     # Return the version as a dot-delimited string.
     # @return [String] the current gem version
