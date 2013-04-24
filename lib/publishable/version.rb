@@ -18,13 +18,13 @@ module Publishable
     MINOR = 0
 
     # The patch-level, incremented for minor bug fixes / patches.
-    PATCH = 0
+    PATCH = 1
 
     # Prerelease specification for e.g. "alpha", "beta.1", etc
     PRERELEASE = nil
 
     # The build number; can be used for e.g. git version of current build, etc.
-    BUILD = Time.now.to_s
+    BUILD = nil
 
     # Return the version as a dot-delimited string.
     # @return [String] the current gem version
