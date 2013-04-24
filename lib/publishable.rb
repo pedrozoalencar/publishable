@@ -1,6 +1,7 @@
 # encoding: utf-8
 
 require 'publishable/railtie' if defined?(Rails)
+require 'workflow'
 
 # Allows a given boolean, date, or datetime column to indicate whether a model object is published.
 # Boolean published column just is an on/off flag.
@@ -24,7 +25,7 @@ module Publishable
 
   # Define scopes and methods for querying and manipulating Publishables.
   module ClassMethods
-
+    include Workflow
     # DSL method to link this behavior into your model.  In your ActiveRecord model class, add +publishable+ to include
     # the scopes and methods for publishable objects.
     #
@@ -37,6 +38,7 @@ module Publishable
     # @option options [String, Symbol] :on (:publishable) The name of the publishable column on the model.
     def publishable(options = {})
       return unless table_exists?
+
       publish_type = (options[:type] || :datetime)
       column_name = nil;
       column_start_name = nil;

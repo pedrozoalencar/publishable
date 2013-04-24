@@ -11,6 +11,7 @@ describe Publishable do
         boolean :published
         attr_accessible :title, :body, :published
         validates :body, :title, :presence => true
+        extend Workflow
         extend Publishable
         publishable :type => :boolean
       end
