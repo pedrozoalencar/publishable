@@ -13,16 +13,16 @@ require 'rake'
 
 begin
   require 'jeweler'
-  require './lib/publishable/version.rb'
+  require './lib/publish_by_period/version.rb'
   Jeweler::Tasks.new do |gem|
-    gem.name = 'publishable'
+    gem.name = 'publishable_by_period'
     gem.license = 'MIT'
-    gem.summary = 'Adds publishing functionality to your active record model'
-    gem.description = 'Provides methods to publish and unpublish your active record models based on a boolean flag, a date, or a datetime. Also adds named scopes to nicely filter your records. Does not touch any controller or views.'
-    gem.email = ['m.linkhorst@googlemail.com', 'info@tinynumbers.com']
-    gem.homepage = 'http://github.com/linki/publishable'
-    gem.authors = ['Martin Linkhorst', 'тιηуηυмвєяѕ']
-    gem.version = "#{Publishable::VERSION}"
+    gem.summary = 'Adds publishing period functionality to your active record model'
+    gem.description = 'Provides methods to publish period your active record models based on a boolean flag, a date, or a datetime. Also adds named scopes to nicely filter your records. Does not touch any controller or views.'
+    gem.email = ['pedrozo.alencar@gmail.com']
+    gem.homepage = 'http://github.com/pedrozoalencar/publish_by_period'
+    gem.authors = ['Renato Alencar']
+    gem.version = "#{PublishByPeriod::VERSION}"
     # dependencies defined in Gemfile
     # gem is a Gem::Specification... see http://docs.rubygems.org/read/chapter/20 for more options
   end
